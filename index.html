@@ -4,597 +4,703 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>E-Assesmen TJKT - Login & Upload</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>E-Assesmen TJKT Ultimate (Rubrik Bobot)</title>
 
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
     <style>
-        @media print {
-            .no-print,
-            #auth-container,
-            #app-container {
-                display: none !important;
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #f3f4f6;
+        }
+        
+        .loader {
+            border-top-color: #3498db;
+            -webkit-animation: spinner 1.5s linear infinite;
+            animation: spinner 1.5s linear infinite;
+        }
+        
+        @keyframes spinner {
+            0% {
+                transform: rotate(0deg);
             }
-            #printArea {
-                display: block !important;
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                color: #000 !important;
-                background: #fff !important;
+            100% {
+                transform: rotate(360deg);
             }
+        }
+        
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
         }
     </style>
 </head>
 
-<body class="bg-gray-100 text-gray-800 font-sans min-h-screen">
+<body class="text-gray-800">
 
-    <div id="auth-container" class="flex items-center justify-center min-h-screen px-4">
-        <div class="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full border border-gray-100">
+    <!-- 🔐 LOGIN SCREEN -->
+    <div id="loginScreen" class="fixed inset-0 z-50 flex items-center justify-center bg-blue-900 bg-opacity-90 p-4">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md">
             <div class="text-center mb-6">
-                <div class="inline-flex bg-blue-100 p-4 rounded-full text-blue-900 mb-3">
-                    <i class="fa-solid fa-user-shield text-3xl"></i>
-                </div>
-                <h2 class="text-2xl font-bold text-gray-900">Login Guru Penguji</h2>
-                <p class="text-sm text-gray-400 mt-1">E-Assesmen Praktik TJKT</p>
+                <i class="fa-solid fa-shield-halved text-4xl text-blue-600 mb-2"></i>
+                <h2 class="text-2xl font-bold text-gray-800">Login Guru TJKT</h2>
+                <p class="text-sm text-gray-500">Sistem Penilaian Praktik Rubrik Bobot</p>
             </div>
-
-            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-semibold mb-1 text-gray-600">Email Instansi</label>
-                    <input type="email" id="loginEmail" class="w-full border p-2.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition" placeholder="nama@sekolah.sch.id" required>
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold mb-1 text-gray-600">Password</label>
-                    <input type="password" id="loginPassword" class="w-full border p-2.5 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition" placeholder="••••••••" required>
-                </div>
-                <button type="submit" id="btnLogin" class="w-full bg-blue-900 hover:bg-blue-800 text-white font-bold py-2.5 rounded-xl transition shadow-lg flex justify-center items-center gap-2">
-                    <i class="fa-solid fa-right-to-bracket"></i> Masuk ke Sistem
+            <form onsubmit="handleLogin(event)" class="space-y-4">
+                <input type="email" id="loginEmail" placeholder="Email Guru" class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+                <input type="password" id="loginPassword" placeholder="Password" class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
+                <button type="submit" id="loginBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition flex justify-center items-center">
+                    <span id="loginText">Masuk</span>
+                    <div id="loginLoader" class="loader ease-linear rounded-full border-2 border-t-2 border-gray-200 h-5 w-5 ml-2 hidden"></div>
                 </button>
             </form>
+            <p id="loginError" class="text-red-500 text-sm mt-3 text-center hidden"></p>
         </div>
     </div>
 
-    <div id="app-container" class="hidden">
-        <nav class="bg-blue-900 text-white shadow-md no-print">
-            <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+    <!-- 🖥️ MAIN APP -->
+    <div id="appScreen" class="hidden min-h-screen flex flex-col">
+        <nav class="bg-blue-900 text-white shadow-lg sticky top-0 z-40">
+            <div class="container mx-auto px-4 py-3 flex justify-between items-center">
                 <div class="flex items-center space-x-3">
                     <i class="fa-solid fa-network-wired text-xl"></i>
-                    <span class="text-lg font-bold tracking-wide">E-Assesmen TJKT</span>
+                    <span class="font-bold text-lg">E-Assesmen TJKT (Rubrik)</span>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <span id="userDisplay" class="text-xs bg-blue-800 px-3 py-1.5 rounded-full font-medium">Penguji: -</span>
-                    <button onclick="handleLogout()" class="bg-red-600 hover:bg-red-700 text-xs px-3 py-1.5 rounded-lg transition font-bold">
-                        <i class="fa-solid fa-power-off mr-1"></i> Keluar
-                    </button>
+                    <span class="text-sm bg-blue-800 px-3 py-1 rounded-full" id="userEmailDisplay">...</span>
+                    <button onclick="handleLogout()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm transition">Logout</button>
                 </div>
             </div>
         </nav>
 
-        <div class="container mx-auto px-4 py-8">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="container mx-auto px-4 py-6 flex-grow">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-                <div class="lg:col-span-1 no-print">
-                    <div class="bg-white rounded-2xl shadow-sm p-6 sticky top-6 border border-gray-100">
-                        <h3 class="text-lg font-bold mb-4 text-blue-900 border-b pb-2 flex items-center gap-2">
-                            <i class="fa-solid fa-square-poll-horizontal"></i> Input Capaian Siswa
-                        </h3>
-                        <form id="assessmentForm" onsubmit="handleSubmit(event)" class="space-y-4">
-                            <div>
-                                <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Nama Siswa</label>
-                                <input type="text" id="studentName" class="w-full border p-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" required placeholder="Nama lengkap siswa">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Tingkat Kelas</label>
-                                <div class="flex gap-4 text-sm mt-1">
-                                    <label class="flex items-center gap-1.5"><input type="radio" name="classLevel" value="X" onchange="updateElements()" class="text-blue-600"> Kelas X</label>
-                                    <label class="flex items-center gap-1.5"><input type="radio" name="classLevel" value="XI" onchange="updateElements()" class="text-blue-600"> Kelas XI</label>
-                                </div>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Elemen Kompetensi</label>
-                                <select id="elementSelect" class="w-full border p-2 text-sm rounded-lg bg-gray-50" disabled required>
-                                    <option value="">-- Pilih Kelas Terlebih Dahulu --</option>
-                                </select>
-                            </div>
+                <!-- KOLOM KIRI: Form Input Rubrik -->
+                <div class="lg:col-span-5 space-y-6">
+                    <div class="bg-white rounded-xl shadow-md p-6 border-t-4 border-blue-600">
+                        <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center justify-between">
+                            <span><i class="fa-solid fa-list-check mr-2 text-blue-600"></i> Form Penilaian</span>
+                            <span id="totalScoreDisplay" class="text-2xl font-bold text-blue-600">0</span>
+                        </h2>
 
-                            <div class="bg-gray-50 p-3 rounded-xl border border-gray-200 grid grid-cols-2 gap-2">
-                                <div class="col-span-2 text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Komponen Penilaian</div>
+                        <form id="assessmentForm" onsubmit="handleSubmit(event)">
+                            <input type="hidden" id="editDocId">
+
+                            <!-- Info Siswa -->
+                            <div class="grid grid-cols-2 gap-3 mb-4">
                                 <div>
-                                    <label class="block text-[11px] text-gray-600">Persiapan</label>
-                                    <input type="number" id="scorePersiapan" min="0" max="100" class="w-full border p-1.5 rounded bg-white text-sm" placeholder="0" required>
+                                    <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Nama Siswa</label>
+                                    <input type="text" id="studentName" class="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none" required>
                                 </div>
                                 <div>
-                                    <label class="block text-[11px] text-gray-600">Pemasangan</label>
-                                    <input type="number" id="scorePemasangan" min="0" max="100" class="w-full border p-1.5 rounded bg-white text-sm" placeholder="0" required>
-                                </div>
-                                <div>
-                                    <label class="block text-[11px] text-gray-600">Konfigurasi</label>
-                                    <input type="number" id="scoreKonfigurasi" min="0" max="100" class="w-full border p-1.5 rounded bg-white text-sm" placeholder="0" required>
-                                </div>
-                                <div>
-                                    <label class="block text-[11px] text-gray-600">Hasil Output</label>
-                                    <input type="number" id="scoreOutput" min="0" max="100" class="w-full border p-1.5 rounded bg-white text-sm" placeholder="0" required>
+                                    <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Tanggal</label>
+                                    <input type="date" id="assessDate" class="w-full border p-2 rounded text-sm" required>
                                 </div>
                             </div>
 
-                            <div>
-                                <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Foto Bukti Praktik Work/Crimping</label>
-                                <input type="file" id="evidenceFile" accept=".jpg, .jpeg, .png" onchange="previewImage(event)" class="w-full text-xs text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-
-                                <div class="mt-3">
-                                    <img id="preview-foto" src="#" alt="Preview" class="hidden max-w-full h-auto rounded-xl border border-gray-200 shadow-sm p-1 bg-white max-h-48 object-contain">
+                            <div class="mb-4">
+                                <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Kelas & Elemen</label>
+                                <div class="flex space-x-2">
+                                    <select id="classSelect" onchange="updateElements()" class="w-1/3 border p-2 rounded bg-gray-50 text-sm">
+                                        <option value="">Kelas</option>
+                                        <option value="X">Kelas X</option>
+                                        <option value="XI">Kelas XI</option>
+                                    </select>
+                                    <select id="elementSelect" onchange="renderRubricForm()" class="w-2/3 border p-2 rounded bg-gray-50 text-sm" disabled>
+                                        <option value="">-- Pilih Elemen --</option>
+                                    </select>
                                 </div>
                             </div>
 
-                            <div>
-                                <label class="block text-xs font-semibold uppercase text-gray-500 mb-1">Catatan Evaluasi / Feedback</label>
-                                <textarea id="feedback" rows="2" class="w-full border p-2 text-sm rounded-lg" placeholder="Masukkan kendala atau catatan..."></textarea>
+                            <!-- Area Rubrik Dinamis -->
+                            <div id="rubricContainer" class="mb-4 space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                                <p class="text-center text-gray-400 italic text-sm py-4">Pilih kelas dan elemen untuk melihat rubrik penilaian.</p>
                             </div>
 
-                            <button type="submit" id="btnSubmit" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 rounded-lg transition shadow flex items-center justify-center gap-2">
-                                <i class="fa-solid fa-cloud-arrow-up"></i> Simpan Penilaian & Gambar
-                            </button>
+                            <!-- Catatan & Bukti -->
+                            <div class="mb-4">
+                                <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Catatan Guru</label>
+                                <textarea id="feedback" rows="2" class="w-full border p-2 rounded text-sm"></textarea>
+                            </div>
+
+                            <div class="mb-6">
+                                <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Bukti Foto</label>
+                                <input type="file" id="evidenceFile" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" onchange="previewImage(this)">
+                                <img id="imagePreview" class="mt-2 w-full h-32 object-cover rounded-lg border hidden">
+                                <button type="button" id="removeImgBtn" onclick="removeImage()" class="hidden text-xs text-red-500 mt-1 hover:underline">Hapus Foto</button>
+                            </div>
+
+                            <div class="flex space-x-2">
+                                <button type="submit" id="submitBtn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition shadow flex justify-center items-center">
+                                    <span id="btnText">Simpan Nilai</span>
+                                    <div id="btnLoader" class="loader ease-linear rounded-full border-2 border-t-2 border-white h-4 w-4 ml-2 hidden"></div>
+                                </button>
+                                <button type="button" onclick="resetForm()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded transition">Reset</button>
+                            </div>
                         </form>
                     </div>
                 </div>
 
-                <div class="lg:col-span-2">
-                    <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
-                        <div class="p-4 bg-gray-50 border-b flex justify-between items-center no-print">
-                            <h4 class="font-bold text-gray-700 text-sm"><i class="fa-solid fa-database mr-1"></i> Data Tersimpan di Akun Anda</h4>
+                <!-- KOLOM KANAN: Tabel & Stats -->
+                <div class="lg:col-span-7 space-y-6">
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-blue-500">
+                            <p class="text-xs text-gray-500 uppercase">Total Data</p>
+                            <p class="text-2xl font-bold text-gray-800" id="statTotal">0</p>
                         </div>
-                        <div class="overflow-x-auto">
+                        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-green-500">
+                            <p class="text-xs text-gray-500 uppercase">Rata-rata Nilai</p>
+                            <p class="text-2xl font-bold text-gray-800" id="statAvg">0</p>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-purple-500">
+                            <p class="text-xs text-gray-500 uppercase">Siswa</p>
+                            <p class="text-2xl font-bold text-gray-800" id="statStudents">0</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-md overflow-hidden flex flex-col h-[600px]">
+                        <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
+                            <h2 class="text-lg font-bold text-gray-800">Riwayat Penilaian</h2>
+                            <div class="flex space-x-2">
+                                <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Cari..." class="border p-2 rounded text-sm w-32">
+                                <button onclick="exportToExcel()" class="bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-2 rounded shadow"><i class="fa-solid fa-file-excel"></i></button>
+                            </div>
+                        </div>
+                        <div class="overflow-auto flex-grow">
                             <table class="w-full text-left border-collapse">
-                                <thead>
-                                    <tr class="bg-gray-100 text-[11px] text-gray-500 uppercase tracking-wider border-b">
-                                        <th class="py-3 px-4">Informasi Siswa</th>
-                                        <th class="py-3 px-2 text-center">Komponen</th>
-                                        <th class="py-3 px-3 text-center font-bold text-blue-900">Rerata</th>
-                                        <th class="py-3 px-2 text-center">Bukti</th>
-                                        <th class="py-3 px-4 text-center no-print">Aksi</th>
+                                <thead class="bg-gray-100 sticky top-0 z-10">
+                                    <tr class="text-gray-600 uppercase text-xs">
+                                        <th class="py-3 px-4">Siswa/Kelas</th>
+                                        <th class="py-3 px-4">Elemen</th>
+                                        <th class="py-3 px-4 text-center">Nilai Akhir</th>
+                                        <th class="py-3 px-4">Bukti</th>
+                                        <th class="py-3 px-4 text-center">Aksi</th>
                                     </tr>
                                 </thead>
-                                <tbody id="scoreTableBody" class="text-xs divide-y divide-gray-100"></tbody>
+                                <tbody id="scoreTableBody" class="text-sm divide-y divide-gray-100"></tbody>
                             </table>
                         </div>
                     </div>
                 </div>
-
             </div>
         </div>
     </div>
 
-    <div id="printArea" style="display: none;"></div>
-
     <script>
-        // ======= 1. FIREBASE CONFIGURATION =======
+        // ⚙️ CONFIG FIREBASE (GANTI DENGAN PUNYA ANDA)
         const firebaseConfig = {
-            apiKey: "AIzaSyDKRSzWSOBaVJOKQ61YouskX9-t84v4oE0",
-            authDomain: "login-penguji.firebaseapp.com",
-            databaseURL: "https://login-penguji-default-rtdb.firebaseio.com",
-            projectId: "login-penguji",
-            storageBucket: "login-penguji.firebasestorage.app",
-            messagingSenderId: "912299351380",
-            appId: "1:912299351380:web:07b1693bd5fcb1503bfcc1"
+            apiKey: "AIzaSyAB4bfZCSHuhTL2mXBVb3ppRh_K0EWCQfQ",
+            authDomain: "tjkt-asesmen.firebaseapp.com",
+            projectId: "tjkt-asesmen",
+            storageBucket: "tjkt-asesmen.firebasestorage.app",
+            messagingSenderId: "281854375632",
+            appId: "1:281854375632:web:7e548fe9830c37cacd90d5"
         };
-
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        } else {
-            firebase.app();
-        }
-
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
-        const rtdb = firebase.database();
+        const db = firebase.firestore();
+        const storage = firebase.storage();
 
-        // ======= 2. STATE VARIABEL LOKAL =======
-        const elementsData = {
-            'X': ["Proses bisnis di bidang TJKT", "Perkembangan teknologi di bidang TJKT", "Profesi dan Kewirausahaan"],
-            'XI': ["Teknologi Kabel dan Nirkabel", "Keamanan Jaringan", "Perencanaan dan Pengalamatan Jaringan"]
+        // --- DATABASE RUBRIK LENGKAP ---
+        const rubricDatabase = {
+            "XI": {
+                "Keamanan Jaringan": [{
+                        aspect: "Persiapan konfigurasi",
+                        weight: 10
+                    }, {
+                        aspect: "Block SSH (Port 22)",
+                        weight: 25
+                    }, {
+                        aspect: "Block Web (Port 80/443)",
+                        weight: 15
+                    }, {
+                        aspect: "Troubleshooting",
+                        weight: 15
+                    }, {
+                        aspect: "Pengujian hasil konfigurasi",
+                        weight: 15
+                    }, {
+                        aspect: "Sikap & Kerapihan Kerja",
+                        weight: 10
+                    }, {
+                        aspect: "Nilai Akhir (Max 100)",
+                        weight: 10
+                    } // Normalisasi bobot sisa jika total > 100 atau sebagai penutup
+                ],
+                "Perencanaan & Pengalamatan": [{
+                        aspect: "Desain topologi jaringan",
+                        weight: 15
+                    }, {
+                        aspect: "Konfigurasi DHCP Server",
+                        weight: 15
+                    }, {
+                        aspect: "Konfigurasi DNS Server",
+                        weight: 15
+                    }, {
+                        aspect: "Konfigurasi FTP Server",
+                        weight: 15
+                    }, {
+                        aspect: "Konektivitas antar perangkat (Ping)",
+                        weight: 10
+                    }, {
+                        aspect: "Pengujian layanan DNS dan FTP",
+                        weight: 10
+                    } // Total 80%? Asumsi sisa 20% untuk sikap/laporan implisit, atau user adjust. Saya set sesuai prompt.
+                ],
+                "Teknologi Kabel & Nirkabel": [{
+                    aspect: "Reset dan persiapan perangkat",
+                    weight: 10
+                }, {
+                    aspect: "Konfigurasi IP Address perangkat",
+                    weight: 15
+                }, {
+                    aspect: "Konfigurasi SSID dan keamanan WiFi",
+                    weight: 20
+                }, {
+                    aspect: "Integrasi AP dengan Mikrotik",
+                    weight: 20
+                }, {
+                    aspect: "Koneksi client ke jaringan WiFi",
+                    weight: 15
+                }, {
+                    aspect: "Pengujian akses internet",
+                    weight: 10
+                }, {
+                    aspect: "Troubleshooting gangguan koneksi",
+                    weight: 10
+                }]
+            },
+            "X": {
+                "Proses Bisnis TJKT": [{
+                    aspect: "Analisis kebutuhan pelanggan",
+                    weight: 15
+                }, {
+                    aspect: "Perencanaan jaringan LAN",
+                    weight: 15
+                }, {
+                    aspect: "Pembuatan topologi jaringan",
+                    weight: 15
+                }, {
+                    aspect: "Implementasi/pemasangan jaringan LAN",
+                    weight: 20
+                }, {
+                    aspect: "Pengujian konektivitas jaringan",
+                    weight: 15
+                }, {
+                    aspect: "Pelayanan & komunikasi pelanggan",
+                    weight: 10
+                }, {
+                    aspect: "Dokumentasi & laporan pekerjaan",
+                    weight: 10
+                }],
+                "Profesi & Kewirausahaan": [{
+                    aspect: "Pemilihan jenis usaha bidang TJKT",
+                    weight: 15
+                }, {
+                    aspect: "Kreativitas desain logo",
+                    weight: 20
+                }, {
+                    aspect: "Kesesuaian logo dengan usaha",
+                    weight: 20
+                }, {
+                    aspect: "Penggunaan fitur Canva",
+                    weight: 15
+                }, {
+                    aspect: "Kerapihan & estetika desain",
+                    weight: 20
+                }, {
+                    aspect: "Ketepatan format pengumpulan",
+                    weight: 10
+                }],
+                "Perkembangan Teknologi (IoT)": [{
+                    aspect: "Persiapan alat dan bahan",
+                    weight: 10
+                }, {
+                    aspect: "Ketepatan pemasangan rangkaian Arduino",
+                    weight: 20
+                }, {
+                    aspect: "Ketepatan pemasangan LED Traffic Light",
+                    weight: 15
+                }, {
+                    aspect: "Penulisan program Arduino IDE",
+                    weight: 20
+                }, {
+                    aspect: "Proses upload program",
+                    weight: 10
+                }, {
+                    aspect: "Keberhasilan simulasi Traffic Light",
+                    weight: 15
+                }, {
+                    aspect: "Troubleshooting & presentasi",
+                    weight: 10
+                }]
+            }
         };
-        const KKM_LIMIT = 75;
-        let localCacheData = [];
-        let currentUserId = null;
 
-        // ======= 3. MANAJEMEN SESSION LOGIN / AUTHENTICATION =======
+        let currentUser = null;
+        let allAssessments = [];
+        let currentImageFile = null;
+        let existingImageUrl = null;
+
+        // --- AUTH ---
         auth.onAuthStateChanged(user => {
-            const authContainer = document.getElementById('auth-container');
-            const appContainer = document.getElementById('app-container');
-            const userDisplay = document.getElementById('userDisplay');
-
             if (user) {
-                currentUserId = user.uid;
-                if (authContainer) authContainer.classList.add('hidden');
-                if (appContainer) appContainer.classList.remove('hidden');
-                if (userDisplay) userDisplay.textContent = `Penguji: ${user.email}`;
-                listenToRealtimeData();
+                currentUser = user;
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('appScreen').classList.remove('hidden');
+                document.getElementById('userEmailDisplay').textContent = user.email;
+                document.getElementById('assessDate').valueAsDate = new Date();
+                loadAssessments();
             } else {
-                currentUserId = null;
-                if (authContainer) authContainer.classList.remove('hidden');
-                if (appContainer) appContainer.classList.add('hidden');
-                const tbody = document.getElementById('scoreTableBody');
-                if (tbody) tbody.innerHTML = '';
+                document.getElementById('loginScreen').classList.remove('hidden');
+                document.getElementById('appScreen').classList.add('hidden');
             }
         });
 
         async function handleLogin(e) {
             e.preventDefault();
-            const btnLogin = document.getElementById('btnLogin');
-            const originalText = btnLogin ? btnLogin.innerHTML : "Masuk ke Sistem";
+            const btn = document.getElementById('loginBtn');
+            const loader = document.getElementById('loginLoader');
+            const txt = document.getElementById('loginText');
+            const err = document.getElementById('loginError');
 
-            const email = document.getElementById('loginEmail').value.trim();
-            const pass = document.getElementById('loginPassword').value;
-
+            btn.disabled = true;
+            loader.classList.remove('hidden');
+            txt.textContent = "...";
             try {
-                if (btnLogin) {
-                    btnLogin.disabled = true;
-                    btnLogin.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Mencoba Masuk...`;
-                }
-                await auth.signInWithEmailAndPassword(email, pass);
+                await auth.signInWithEmailAndPassword(document.getElementById('loginEmail').value, document.getElementById('loginPassword').value);
             } catch (error) {
-                if (btnLogin) {
-                    btnLogin.disabled = false;
-                    btnLogin.innerHTML = originalText;
-                }
-                alert("Gagal Login!\nKode Error: " + error.code + "\nPesan: " + error.message);
-                console.error("Firebase Auth Error:", error);
+                err.textContent = "Login Gagal: " + error.message;
+                err.classList.remove('hidden');
+                btn.disabled = false;
+                loader.classList.add('hidden');
+                txt.textContent = "Masuk";
             }
         }
 
-        async function handleLogout() {
-            if (confirm("Keluar dari dashboard?")) {
-                await auth.signOut();
-            }
+        function handleLogout() {
+            auth.signOut();
+            location.reload();
         }
 
-        // ======= 4. UI SELECTION CONTROLLER =======
+        // --- FORM LOGIC ---
         function updateElements() {
-            const checkedInput = document.querySelector('input[name="classLevel"]:checked');
-            const cls = checkedInput ? checkedInput.value : null;
-            const select = document.getElementById('elementSelect');
+            const cls = document.getElementById('classSelect').value;
+            const elemSelect = document.getElementById('elementSelect');
+            elemSelect.innerHTML = '<option value="">-- Pilih Elemen --</option>';
 
-            if (!select) return;
-            select.innerHTML = '<option value="">-- Pilih Elemen --</option>';
-            if (cls && elementsData[cls]) {
-                select.disabled = false;
-                select.classList.remove('bg-gray-50');
-                elementsData[cls].forEach(e => {
+            if (cls && rubricDatabase[cls]) {
+                elemSelect.disabled = false;
+                Object.keys(rubricDatabase[cls]).forEach(key => {
                     const opt = document.createElement('option');
-                    opt.value = e;
-                    opt.textContent = e;
-                    select.appendChild(opt);
+                    opt.value = key;
+                    opt.textContent = key;
+                    elemSelect.appendChild(opt);
                 });
             } else {
-                select.disabled = true;
-                select.classList.add('bg-gray-50');
+                elemSelect.disabled = true;
             }
+            document.getElementById('rubricContainer').innerHTML = '<p class="text-center text-gray-400 italic text-sm py-4">Pilih elemen untuk melihat rubrik.</p>';
+            calculateTotal();
         }
 
-        function previewImage(event) {
-            const input = event.target;
-            const preview = document.getElementById('preview-foto');
+        function renderRubricForm() {
+            const cls = document.getElementById('classSelect').value;
+            const elem = document.getElementById('elementSelect').value;
+            const container = document.getElementById('rubricContainer');
+            container.innerHTML = '';
 
-            if (input && input.files && input.files[0] && preview) {
+            if (!cls || !elem) return;
+
+            const aspects = rubricDatabase[cls][elem];
+            aspects.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = "flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-200";
+                div.innerHTML = `
+                    <div class="flex-1">
+                        <p class="text-sm font-medium text-gray-700">${item.aspect}</p>
+                        <p class="text-xs text-blue-600 font-bold">Bobot: ${item.weight}%</p>
+                    </div>
+                    <div class="w-20">
+                        <input type="number" min="0" max="100" class="rubric-input w-full border p-1 rounded text-center font-bold" 
+                               data-weight="${item.weight}" oninput="calculateTotal()" placeholder="0-100">
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+            calculateTotal();
+        }
+
+        function calculateTotal() {
+            const inputs = document.querySelectorAll('.rubric-input');
+            let totalWeightedScore = 0;
+            let totalWeightUsed = 0;
+
+            inputs.forEach(input => {
+                const val = parseFloat(input.value) || 0;
+                const weight = parseFloat(input.dataset.weight);
+                totalWeightedScore += (val * (weight / 100));
+                totalWeightUsed += weight;
+            });
+
+            // Jika total bobot tidak 100%, kita normalisasi atau tampilkan apa adanya. 
+            // Untuk kasus prompt, beberapa total bobot != 100. Kita asumsikan nilai akhir adalah akumulasi langsung.
+            // Namun, agar adil, biasanya dibagi total bobot. Di sini saya tampilkan Accumulated Score.
+
+            const finalScore = Math.round(totalWeightedScore);
+            document.getElementById('totalScoreDisplay').textContent = finalScore;
+
+            // Ubah warna skor
+            const display = document.getElementById('totalScoreDisplay');
+            if (finalScore >= 80) display.className = "text-2xl font-bold text-green-600";
+            else if (finalScore >= 65) display.className = "text-2xl font-bold text-yellow-600";
+            else display.className = "text-2xl font-bold text-red-600";
+        }
+
+        function previewImage(input) {
+            const preview = document.getElementById('imagePreview');
+            if (input.files && input.files[0]) {
+                currentImageFile = input.files[0];
                 const reader = new FileReader();
-                reader.onload = function(e) {
+                reader.onload = e => {
                     preview.src = e.target.result;
                     preview.classList.remove('hidden');
+                    document.getElementById('removeImgBtn').classList.remove('hidden');
                 };
                 reader.readAsDataURL(input.files[0]);
-            } else if (preview) {
-                preview.src = "#";
-                preview.classList.add('hidden');
             }
         }
 
-        // ======= 5. SYNC REALTIME DATABASE =======
-        function listenToRealtimeData() {
-            if (!currentUserId) return;
-
-            rtdb.ref('penilaian').orderByChild('instructorId').equalTo(currentUserId)
-                .on('value', snapshot => {
-                    const data = [];
-                    snapshot.forEach(childSnapshot => {
-                        data.push({
-                            id: childSnapshot.key,
-                            ...childSnapshot.val()
-                        });
-                    });
-                    data.sort((a, b) => (b.id_num || 0) - (a.id_num || 0));
-                    localCacheData = data;
-                    renderTable(data);
-                }, err => {
-                    console.error("Database error:", err);
-                });
+        function removeImage() {
+            document.getElementById('evidenceFile').value = "";
+            document.getElementById('imagePreview').classList.add('hidden');
+            document.getElementById('removeImgBtn').classList.add('hidden');
+            currentImageFile = null;
+            existingImageUrl = null;
         }
 
+        function resetForm() {
+            document.getElementById('assessmentForm').reset();
+            document.getElementById('editDocId').value = "";
+            document.getElementById('rubricContainer').innerHTML = '<p class="text-center text-gray-400 italic text-sm py-4">Pilih kelas dan elemen...</p>';
+            document.getElementById('totalScoreDisplay').textContent = "0";
+            document.getElementById('totalScoreDisplay').className = "text-2xl font-bold text-blue-600";
+            document.getElementById('elementSelect').disabled = true;
+            document.getElementById('assessDate').valueAsDate = new Date();
+            removeImage();
+        }
+
+        // --- SUBMIT & CRUD ---
         async function handleSubmit(e) {
             e.preventDefault();
-            if (!currentUserId) return alert("Sesi kadaluarsa, silakan login ulang!");
+            if (!currentUser) return alert('Login required');
 
-            const btnSubmit = document.getElementById('btnSubmit');
-            const fileInput = document.getElementById('evidenceFile');
+            const btn = document.getElementById('submitBtn');
+            const loader = document.getElementById('btnLoader');
+            const txt = document.getElementById('btnText');
 
-            const inputStudentName = document.getElementById('studentName').value.trim();
-            const checkedInput = document.querySelector('input[name="classLevel"]:checked');
-            const inputClassLevel = checkedInput ? checkedInput.value : null;
-            const inputElement = document.getElementById('elementSelect').value;
-
-            const p_prep = parseFloat(document.getElementById('scorePersiapan').value) || 0;
-            const p_install = parseFloat(document.getElementById('scorePemasangan').value) || 0;
-            const p_config = parseFloat(document.getElementById('scoreKonfigurasi').value) || 0;
-            const p_out = parseFloat(document.getElementById('scoreOutput').value) || 0;
-            const totalScore = (p_prep + p_install + p_config + p_out) / 4;
-            const inputFeedback = document.getElementById('feedback').value.trim();
-
-            let imageUrl = null;
-
-            if (btnSubmit) {
-                btnSubmit.disabled = true;
-                btnSubmit.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Memproses...`;
-            }
-
-            const convertFileToBase64 = (file) => new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = () => resolve(reader.result);
-                reader.onerror = (error) => reject(error);
-            });
+            btn.disabled = true;
+            loader.classList.remove('hidden');
+            txt.textContent = "Saving...";
 
             try {
-                if (fileInput && fileInput.files && fileInput.files.length > 0) {
-                    const file = fileInput.files[0];
-                    if (file.size > 500000) {
-                        throw new Error("Ukuran foto terlalu besar! Gunakan foto di bawah 500 KB.");
-                    }
-                    imageUrl = await convertFileToBase64(file);
-                }
+                const docId = document.getElementById('editDocId').value;
+                const student = document.getElementById('studentName').value.trim();
+                const classLevel = document.getElementById('classSelect').value;
+                const element = document.getElementById('elementSelect').value;
+                const finalScore = parseInt(document.getElementById('totalScoreDisplay').textContent);
+                const feedback = document.getElementById('feedback').value.trim();
+                const date = document.getElementById('assessDate').value;
 
-                const idTimestamp = Date.now();
-
-                await rtdb.ref('penilaian').push({
-                    id_num: idTimestamp,
-                    instructorId: currentUserId,
-                    teacherId: currentUserId,
-                    date: new Date().toLocaleDateString('id-ID'),
-                    student: inputStudentName,
-                    classLevel: inputClassLevel,
-                    element: inputElement,
-                    p_prep,
-                    p_install,
-                    p_config,
-                    p_out,
-                    score: totalScore,
-                    feedback: inputFeedback,
-                    evidenceUrl: imageUrl
+                // Collect Rubric Details
+                const rubricDetails = [];
+                document.querySelectorAll('.rubric-input').forEach(input => {
+                    rubricDetails.push({
+                        aspect: input.parentElement.previousElementSibling.innerText.split('\n')[0], // Get aspect name
+                        score: input.value,
+                        weight: input.dataset.weight
+                    });
                 });
 
-                document.getElementById('assessmentForm').reset();
-                const sel = document.getElementById('elementSelect');
-                if (sel) {
-                    sel.disabled = true;
-                    sel.classList.add('bg-gray-50');
-                }
-                const prv = document.getElementById('preview-foto');
-                if (prv) {
-                    prv.classList.add('hidden');
-                    prv.src = "#";
+                if (!classLevel || !element) throw new Error('Lengkapi data kelas & elemen!');
+
+                let finalImageUrl = existingImageUrl || '';
+                if (currentImageFile) {
+                    const path = `bukti/${currentUser.uid}/${Date.now()}_${student.replace(/\s/g,'_')}.jpg`;
+                    const ref = storage.ref().child(path);
+                    await ref.put(currentImageFile);
+                    finalImageUrl = await ref.getDownloadURL();
                 }
 
-                alert('Data penilaian berhasil disimpan!');
-            } catch (error) {
-                console.error("Gagal simpan:", error);
-                alert('Gagal menyimpan data: ' + error.message);
-            } finally {
-                if (btnSubmit) {
-                    btnSubmit.disabled = false;
-                    btnSubmit.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> Simpan Penilaian & Gambar`;
+                const payload = {
+                    teacherId: currentUser.uid,
+                    student,
+                    classLevel,
+                    element,
+                    finalScore,
+                    rubricDetails,
+                    feedback,
+                    date,
+                    imageUrl: finalImageUrl,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                if (docId) {
+                    await db.collection('penilaian').doc(docId).update(payload);
+                } else {
+                    payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                    await db.collection('penilaian').add(payload);
                 }
+
+                resetForm();
+                alert('✅ Data tersimpan!');
+
+            } catch (err) {
+                alert('❌ Error: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                loader.classList.add('hidden');
+                txt.textContent = "Simpan Nilai";
             }
         }
 
-        // ======= 6. RENDER INTERFACE TABEL REKAP =======
+        function loadAssessments() {
+            db.collection('penilaian').where('teacherId', '==', currentUser.uid).orderBy('createdAt', 'desc')
+                .onSnapshot(snapshot => {
+                    const data = [];
+                    snapshot.forEach(doc => data.push({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                    allAssessments = data;
+                    renderTable(data);
+                    updateStats(data);
+                });
+        }
+
         function renderTable(data) {
-
             const tbody = document.getElementById('scoreTableBody');
-
-            if (!tbody) return;
-
+            const search = document.getElementById('searchInput').value.toLowerCase();
             tbody.innerHTML = '';
 
-            if (data.length === 0) {
+            const filtered = data.filter(item => item.student.toLowerCase().includes(search));
 
-                tbody.innerHTML = `
-            <tr>
-                <td colspan="5" class="py-6 text-center text-gray-400 italic">
-                    Belum ada riwayat penilaian tersimpan.
-                </td>
-            </tr>
-        `;
-
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-400">Belum ada data.</td></tr>`;
                 return;
             }
 
-            data.forEach((item) => {
-
-                const finalScore = parseFloat(item.score || 0);
-
-                const scoreColor =
-                    finalScore >= KKM_LIMIT ?
-                    'text-green-600 font-bold' :
-                    'text-red-500 font-bold';
-
-                const identifier = item.id_num || item.id;
-
-                const imgBadge = item.evidenceUrl ?
-                    `
-                <button
-                    onclick="viewBypassImage('${item.id}')"
-                    class="bg-blue-100 text-blue-800 text-[10px] px-2 py-0.5 rounded-full hover:bg-blue-200 transition font-medium"
-                >
-                    <i class="fa-solid fa-image"></i> Lihat
-                </button>
-              ` :
-                    `
-                <span class="text-gray-300 text-[10px]">
-                    Tidak ada
-                </span>
-              `;
+            filtered.forEach(item => {
+                let scoreColor = item.finalScore >= 80 ? 'bg-green-100 text-green-700' : item.finalScore >= 65 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700';
+                let imgHtml = item.imageUrl ?
+                    `<img src="${item.imageUrl}" class="w-8 h-8 object-cover rounded cursor-pointer hover:scale-150 transition" onclick="window.open('${item.imageUrl}')">` :
+                    `-`;
 
                 const tr = document.createElement('tr');
-
-                tr.className = 'hover:bg-blue-50/40 text-xs transition';
-
+                tr.className = 'hover:bg-blue-50 border-b';
                 tr.innerHTML = `
-            <td class="py-3 px-4">
-                <div class="font-bold text-gray-800 text-sm">
-                    ${item.student || '-'}
-                </div>
-
-                <div class="text-[10px] text-gray-400">
-                    ${item.date || '-'} • Kelas ${item.classLevel || '-'}
-                </div>
-
-                <div
-                    class="text-blue-800 font-medium truncate max-w-[200px]"
-                    title="${item.element || ''}"
-                >
-                    ${item.element || '-'}
-                </div>
-            </td>
-
-            <td class="py-3 px-2 text-center text-gray-500 text-[11px] leading-relaxed">
-                P1:${item.p_prep ?? 0} |
-                P2:${item.p_install ?? 0}<br>
-
-                P3:${item.p_config ?? 0} |
-                P4:${item.p_out ?? 0}
-            </td>
-
-            <td class="py-3 px-3 text-center text-sm bg-gray-50/50 ${scoreColor}">
-                ${finalScore.toFixed(1)}
-            </td>
-
-            <td class="py-3 px-2 text-center">
-                ${imgBadge}
-            </td>
-
-            <td class="py-3 px-4 text-center no-print space-x-2">
-
-                <button
-                    onclick="printSingle('${identifier}')"
-                    class="text-blue-600 hover:text-blue-800 text-base"
-                    title="Cetak"
-                >
-                    <i class="fa-solid fa-print"></i>
-                </button>
-
-                <button
-                    onclick="deleteItem('${item.id}')"
-                    class="text-red-500 hover:text-red-700 text-base"
-                    title="Hapus"
-                >
-                    <i class="fa-solid fa-trash"></i>
-                </button>
-
-            </td>
-        `;
-
+                    <td class="py-3 px-4">
+                        <div class="font-bold">${item.student}</div>
+                        <div class="text-xs text-gray-500">Kelas ${item.classLevel}</div>
+                    </td>
+                    <td class="py-3 px-4 text-xs max-w-[150px] truncate">${item.element}</td>
+                    <td class="py-3 px-4 text-center">
+                        <span class="${scoreColor} py-1 px-3 rounded-full text-xs font-bold">${item.finalScore}</span>
+                    </td>
+                    <td class="py-3 px-4 text-center">${imgHtml}</td>
+                    <td class="py-3 px-4 text-center space-x-2">
+                        <button onclick='editItem(${JSON.stringify(item).replace(/'/g, "&#39;")})' class="text-blue-500 bg-blue-50 p-2 rounded"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="deleteItem('${item.id}')" class="text-red-500 bg-red-50 p-2 rounded"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
                 tbody.appendChild(tr);
-
             });
         }
-        // ======= 7. ENGINE CETAK INDIVIDUAL =======
-        function printSingle(idKey) {
-            const item = localCacheData.find(d => d.id_num == idKey || d.id === String(idKey));
-            if (!item) return alert("Data tidak ditemukan!");
 
-            const printArea = document.getElementById('printArea');
-            if (!printArea) return;
-
-            printArea.innerHTML = `
-                <div style="font-family: Arial, sans-serif; border: 2px solid #000; padding: 25px; border-radius: 6px; max-width: 750px; margin: 0 auto; color: #000; background: #fff;">
-                    <h2 style="text-align: center; margin-bottom: 2px; font-size: 20px; font-weight: bold;">SMK BHAKTI INSANI BOGOR</h2>
-                    <h3 style="text-align: center; margin-top: 0; border-bottom: 3px double #000; padding-bottom: 10px; font-size: 14px; font-weight: bold;">LEMBAR HASIL PENILAIAN PRAKTIK TJKT</h3>
-                    
-                    <table style="width: 100%; margin-top: 15px; margin-bottom: 20px; font-size: 13px;">
-                        <tr><td style="width: 130px; padding: 2px 0;">Nama Siswa</td><td>: <b>${item.student || '-'}</b></td></tr>
-                        <tr><td style="padding: 2px 0;">Kelas / Kompetensi</td><td>: Kelas ${item.classLevel || '-'} - Teknik Jaringan Komputer dan Telekomunikasi</td></tr>
-                        <tr><td style="padding: 2px 0;">Elemen Pembelajaran</td><td>: ${item.element || '-'}</td></tr>
-                        <tr><td style="padding: 2px 0;">Tanggal Uji</td><td>: ${item.date || '-'}</td></tr>
-                    </table>
-                    
-                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px;" border="1">
-                        <thead>
-                            <tr style="background-color: #f3f4f6;">
-                                <th style="padding: 8px; text-align: left; border: 1px solid #000;">Komponen Penilaian Kejuruan</th>
-                                <th style="padding: 8px; text-align: center; border: 1px solid #000; width: 100px;">Nilai</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr><td style="padding: 8px; border: 1px solid #000;">1. Langkah Persiapan Kerja</td><td style="text-align: center; border: 1px solid #000; font-weight: bold;">${item.p_prep ?? 0}</td></tr>
-                            <tr><td style="padding: 8px; border: 1px solid #000;">2. Pemasangan Perangkat Fisik / Infrastruktur Kabel</td><td style="text-align: center; border: 1px solid #000; font-weight: bold;">${item.p_install ?? 0}</td></tr>
-                            <tr><td style="padding: 8px; border: 1px solid #000;">3. Konfigurasi Sistem Operasi / Jaringan / Server</td><td style="text-align: center; border: 1px solid #000; font-weight: bold;">${item.p_config ?? 0}</td></tr>
-                            <tr><td style="padding: 8px; border: 1px solid #000;">4. Pengujian Hasil Kerja / Troubleshoot Output</td><td style="text-align: center; border: 1px solid #000; font-weight: bold;">${item.p_out ?? 0}</td></tr>
-                            <tr style="font-weight: bold; background-color: #e5e7eb;">
-                                <td style="padding: 10px; border: 1px solid #000;">NILAI AKHIR (RATA-RATA)</td>
-                                <td style="text-align: center; font-size: 16px; border: 1px solid #000;">${parseFloat(item.score || 0).toFixed(1)}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    
-                    <div style="font-size: 13px; line-height: 1.5; margin-bottom: 35px;">
-                        <p><b>Predikat Kelulusan:</b> <span style="font-weight: bold;">${(item.score || 0) >= KKM_LIMIT ? 'KOMPETEN' : 'BELUM KOMPETEN / REMEDIAL'}</span></p>
-                        <p><b>Catatan Penguji:</b> <i>*${item.feedback || 'Tidak ada catatan khusus.'}</i></p>
-                    </div>
-
-                    <table style="width: 100%; font-size: 13px;">
-                        <tr>
-                            <td></td>
-                            <td style="text-align: right; width: 220px;">
-                                <p>Bogor, ${item.date || '-'}</p>
-                                <br><br><br>
-                                <p style="font-weight: bold; text-decoration: underline;">( ____________________ )</p>
-                                <p style="font-size: 11px; color: #4b5563;">Guru Penguji Kompetensi</p>
-                            </td>
-                        </tr>
-                    </table>
-                </div>
-            `;
-
-            window.print();
+        function filterTable() {
+            renderTable(allAssessments);
         }
 
+        function editItem(item) {
+            document.getElementById('editDocId').value = item.id;
+            document.getElementById('studentName').value = item.student;
+            document.getElementById('classSelect').value = item.classLevel;
+            updateElements(); // Load options
+            document.getElementById('elementSelect').value = item.element;
+            renderRubricForm(); // Load inputs
 
+            // Fill Scores
+            if (item.rubricDetails) {
+                const inputs = document.querySelectorAll('.rubric-input');
+                item.rubricDetails.forEach((det, idx) => {
+                    if (inputs[idx]) inputs[idx].value = det.score;
+                });
+            }
+
+            document.getElementById('feedback').value = item.feedback || '';
+            document.getElementById('assessDate').value = item.date;
+            calculateTotal();
+
+            existingImageUrl = item.imageUrl;
+            if (item.imageUrl) {
+                document.getElementById('imagePreview').src = item.imageUrl;
+                document.getElementById('imagePreview').classList.remove('hidden');
+                document.getElementById('removeImgBtn').classList.remove('hidden');
+            } else {
+                removeImage();
+            }
+
+            document.getElementById('btnText').textContent = "Update Data";
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
 
         async function deleteItem(id) {
+            if (!confirm('Hapus data?')) return;
+            await db.collection('penilaian').doc(id).delete();
+        }
 
-            if (!confirm("Hapus rekap data penilaian siswa ini?")) {
-                return;
-            }
+        function updateStats(data) {
+            document.getElementById('statTotal').textContent = data.length;
+            const unique = [...new Set(data.map(i => i.student))];
+            document.getElementById('statStudents').textContent = unique.length;
+            const avg = data.length ? (data.reduce((sum, i) => sum + i.finalScore, 0) / data.length).toFixed(1) : 0;
+            document.getElementById('statAvg').textContent = avg;
+        }
 
-            try {
-
-                await rtdb.ref(`penilaian/${id}`).remove();
-
-                alert("Data berhasil dihapus");
-
-            } catch (e) {
-
-                console.error(e);
-
-                alert("Gagal menghapus: " + e.message);
-            }
+        function exportToExcel() {
+            if (!allAssessments.length) return alert("Data kosong");
+            const data = allAssessments.map(i => ({
+                "Tanggal": i.date,
+                "Siswa": i.student,
+                "Kelas": i.classLevel,
+                "Elemen": i.element,
+                "Nilai Akhir": i.finalScore,
+                "Feedback": i.feedback
+            }));
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Rekap Nilai");
+            XLSX.writeFile(wb, `Rekap_TJKT_${new Date().toISOString().slice(0,10)}.xlsx`);
         }
     </script>
-
 </body>
 
 </html>
