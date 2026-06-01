@@ -506,8 +506,16 @@
         }
 
         // --- SUBMIT & CRUD ---
+
         async function handleSubmit(e) {
             e.preventDefault();
+
+            // 🚫 SKIP UPLOAD FOTO - SOLUSI DARURAT CORS
+            let finalImageUrl = '';
+            currentImageFile = null;
+            existingImageUrl = null;
+
+            // ... lanjut kode biasa di bawah ini ...
             if (!currentUser) return alert('Login required');
 
             const btn = document.getElementById('submitBtn');
@@ -542,8 +550,8 @@
                 let finalImageUrl = existingImageUrl || '';
                 if (currentImageFile) {
                     const path = `bukti/${currentUser.uid}/${Date.now()}_${student.replace(/\s/g,'_')}.jpg`;
-                    const ref = storage.ref().child(path);
-                    await ref.put(currentImageFile);
+
+
                     finalImageUrl = await ref.getDownloadURL();
                 }
 
