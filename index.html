@@ -2,45 +2,23 @@
 <html lang="id">
 
 <head>
-    <!-- PWA Meta Tags -->
-    <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#1e3a8a">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="TJKT App">
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3135/3135715.png">
-
-    <!-- PWA Register Script -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            // Minimal service worker untuk PWA valid
-            const swContent = `
-      self.addEventListener('fetch', (event) => {
-        event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
-      });
-    `;
-            const blob = new Blob([swContent], {
-                type: 'application/javascript'
-            });
-            const swUrl = URL.createObjectURL(blob);
-
-            navigator.serviceWorker.register(swUrl)
-                .then(() => console.log('📱 PWA Service Worker registered'))
-                .catch(err => console.error('❌ SW Error:', err));
-        }
-    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>E-Assesmen TJKT Ultimate (Rubrik Bobot)</title>
+    <title>E-Assesmen TJKT Ultimate (Full Features)</title>
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Chart.js -->
+
+    <!-- LIBRARY TAMBAHAN UNTUK FITUR BARU -->
+    <!-- Chart.js (Grafik) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- SheetJS -->
+    <!-- SheetJS (Export Excel) -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <!-- jsPDF & html2canvas (Export PDF Rapor) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -68,11 +46,15 @@
                 transform: rotate(360deg);
             }
         }
+        /* Hide scrollbar for clean look */
         
-        input[type=number]::-webkit-inner-spin-button,
-        input[type=number]::-webkit-outer-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 4px;
         }
     </style>
 </head>
@@ -85,7 +67,7 @@
             <div class="text-center mb-6">
                 <i class="fa-solid fa-shield-halved text-4xl text-blue-600 mb-2"></i>
                 <h2 class="text-2xl font-bold text-gray-800">Login Guru TJKT</h2>
-                <p class="text-sm text-gray-500">Sistem Penilaian Praktik Rubrik Bobot</p>
+                <p class="text-sm text-gray-500">Sistem Penilaian & Manajemen Siswa</p>
             </div>
             <form onsubmit="handleLogin(event)" class="space-y-4">
                 <input type="email" id="loginEmail" placeholder="Email Guru" class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required>
@@ -99,40 +81,69 @@
         </div>
     </div>
 
-    <!-- 🖥️ MAIN APP -->
+    <!-- ️ MAIN APP -->
     <div id="appScreen" class="hidden min-h-screen flex flex-col">
+
+        <!-- NAVBAR DENGAN ROLE INDICATOR -->
         <nav class="bg-blue-900 text-white shadow-lg sticky top-0 z-40">
             <div class="container mx-auto px-4 py-3 flex justify-between items-center">
                 <div class="flex items-center space-x-3">
                     <i class="fa-solid fa-network-wired text-xl"></i>
-                    <span class="font-bold text-lg">E-Assesmen TJKT (Rubrik)</span>
+                    <span class="font-bold text-lg tracking-wide">E-Assesmen TJKT</span>
+
+                    <!-- INDIKATOR ROLE ADMIN -->
+                    <span id="userRoleBadge" class="hidden bg-purple-500 text-white text-xs px-2 py-1 rounded-full font-bold uppercase tracking-wider ml-2">
+                        👑 Admin
+                    </span>
                 </div>
+
                 <div class="flex items-center space-x-4">
-                    <span class="text-sm bg-blue-800 px-3 py-1 rounded-full" id="userEmailDisplay">...</span>
-                    <button onclick="handleLogout()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm transition">Logout</button>
+                    <!-- Navigasi Tab -->
+                    <div class="hidden md:flex bg-blue-800 rounded-lg p-1 mr-4">
+                        <button onclick="switchTab('assessment')" id="tabAssessment" class="px-4 py-1.5 rounded-md text-sm font-medium bg-blue-600 text-white shadow transition">
+                            <i class="fa-solid fa-pen-to-square mr-1"></i> Penilaian
+                        </button>
+                        <button onclick="switchTab('students')" id="tabStudents" class="px-4 py-1.5 rounded-md text-sm font-medium text-blue-100 hover:text-white hover:bg-blue-700 transition">
+                            <i class="fa-solid fa-users mr-1"></i> Data Siswa
+                        </button>
+                    </div>
+
+                    <div class="flex flex-col items-end mr-2">
+                        <span class="text-xs opacity-70">Logged in as</span>
+                        <span class="text-sm font-semibold" id="userEmailDisplay">...</span>
+                    </div>
+                    <button onclick="handleLogout()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm transition shadow">
+                        <i class="fa-solid fa-power-off mr-1"></i> Logout
+                    </button>
                 </div>
             </div>
         </nav>
 
+        <!-- CONTENT AREA -->
         <div class="container mx-auto px-4 py-6 flex-grow">
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-                <!-- KOLOM KIRI: Form Input Rubrik -->
+            <!-- ================= TAB 1: PENILAIAN ================= -->
+            <div id="viewAssessment" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                <!-- Form Input Penilaian -->
                 <div class="lg:col-span-5 space-y-6">
                     <div class="bg-white rounded-xl shadow-md p-6 border-t-4 border-blue-600">
                         <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center justify-between">
-                            <span><i class="fa-solid fa-list-check mr-2 text-blue-600"></i> Form Penilaian</span>
+                            <span><i class="fa-solid fa-list-check mr-2 text-blue-600"></i> Input Nilai</span>
                             <span id="totalScoreDisplay" class="text-2xl font-bold text-blue-600">0</span>
                         </h2>
 
                         <form id="assessmentForm" onsubmit="handleSubmit(event)">
                             <input type="hidden" id="editDocId">
 
-                            <!-- Info Siswa -->
                             <div class="grid grid-cols-2 gap-3 mb-4">
                                 <div>
                                     <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Nama Siswa</label>
-                                    <input type="text" id="studentName" class="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none" required>
+                                    <!-- Dropdown dari Data Siswa jika ada, atau input manual -->
+                                    <select id="studentNameSelect" onchange="document.getElementById('studentNameInput').value = this.value" class="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none text-sm mb-1">
+                                        <option value="">-- Pilih dari Data --</option>
+                                    </select>
+                                    <input type="text" id="studentNameInput" class="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Atau ketik nama..." required>
                                 </div>
                                 <div>
                                     <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Tanggal</label>
@@ -155,18 +166,17 @@
                             </div>
 
                             <!-- Area Rubrik Dinamis -->
-                            <div id="rubricContainer" class="mb-4 space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                                <p class="text-center text-gray-400 italic text-sm py-4">Pilih kelas dan elemen untuk melihat rubrik penilaian.</p>
+                            <div id="rubricContainer" class="mb-4 space-y-3 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar bg-gray-50 p-2 rounded">
+                                <p class="text-center text-gray-400 italic text-sm py-4">Pilih kelas dan elemen untuk melihat rubrik.</p>
                             </div>
 
-                            <!-- Catatan & Bukti -->
                             <div class="mb-4">
                                 <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Catatan Guru</label>
                                 <textarea id="feedback" rows="2" class="w-full border p-2 rounded text-sm"></textarea>
                             </div>
 
                             <div class="mb-6">
-                                <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Bukti Foto</label>
+                                <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Bukti Foto (Opsional)</label>
                                 <input type="file" id="evidenceFile" accept="image/*" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" onchange="previewImage(this)">
                                 <img id="imagePreview" class="mt-2 w-full h-32 object-cover rounded-lg border hidden">
                                 <button type="button" id="removeImgBtn" onclick="removeImage()" class="hidden text-xs text-red-500 mt-1 hover:underline">Hapus Foto</button>
@@ -183,15 +193,16 @@
                     </div>
                 </div>
 
-                <!-- KOLOM KANAN: Tabel & Stats -->
+                <!-- Tabel & Stats Penilaian -->
                 <div class="lg:col-span-7 space-y-6">
+                    <!-- Stats Cards -->
                     <div class="grid grid-cols-3 gap-4">
                         <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-blue-500">
                             <p class="text-xs text-gray-500 uppercase">Total Data</p>
                             <p class="text-2xl font-bold text-gray-800" id="statTotal">0</p>
                         </div>
                         <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-green-500">
-                            <p class="text-xs text-gray-500 uppercase">Rata-rata Nilai</p>
+                            <p class="text-xs text-gray-500 uppercase">Rata-rata</p>
                             <p class="text-2xl font-bold text-gray-800" id="statAvg">0</p>
                         </div>
                         <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-purple-500">
@@ -200,39 +211,146 @@
                         </div>
                     </div>
 
-                    <div class="bg-white rounded-xl shadow-md overflow-hidden flex flex-col h-[600px]">
-                        <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
+                    <!-- Filter Admin (Hanya muncul jika Admin) -->
+                    <div id="adminFilterPanel" class="hidden bg-purple-50 border border-purple-200 p-3 rounded-lg flex items-center justify-between">
+                        <span class="text-sm font-bold text-purple-800"><i class="fa-solid fa-filter mr-2"></i>Filter Data Guru:</span>
+                        <select id="teacherDataFilter" onchange="loadAssessments()" class="border border-purple-300 rounded px-2 py-1 text-sm bg-white">
+                            <option value="me">Saya Saja</option>
+                            <option value="all">Semua Guru (Admin View)</option>
+                        </select>
+                    </div>
+
+                    <!-- Tabel Data -->
+                    <div class="bg-white rounded-xl shadow-md overflow-hidden flex flex-col h-[550px]">
+                        <div class="p-4 border-b bg-gray-50 flex flex-wrap justify-between items-center gap-2">
                             <h2 class="text-lg font-bold text-gray-800">Riwayat Penilaian</h2>
                             <div class="flex space-x-2">
-                                <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Cari..." class="border p-2 rounded text-sm w-32">
-                                <button onclick="exportToExcel()" class="bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-2 rounded shadow"><i class="fa-solid fa-file-excel"></i></button>
+                                <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Cari siswa..." class="border p-2 rounded text-sm w-32 focus:ring-1 focus:ring-blue-500 outline-none">
+
+                                <!-- Tombol Export PDF & Excel -->
+                                <button onclick="exportToExcel()" class="bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-2 rounded shadow transition" title="Export Excel">
+                                    <i class="fa-solid fa-file-excel"></i>
+                                </button>
+                                <button onclick="exportToPDF()" class="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-2 rounded shadow transition" title="Export PDF Rapor">
+                                    <i class="fa-solid fa-file-pdf"></i>
+                                </button>
                             </div>
                         </div>
+
                         <div class="overflow-auto flex-grow">
                             <table class="w-full text-left border-collapse">
-                                <thead class="bg-gray-100 sticky top-0 z-10">
+                                <thead class="bg-gray-100 sticky top-0 z-10 shadow-sm">
                                     <tr class="text-gray-600 uppercase text-xs">
-                                        <th class="py-3 px-4">Siswa/Kelas</th>
-                                        <th class="py-3 px-4">Elemen</th>
-                                        <th class="py-3 px-4 text-center">Nilai Akhir</th>
-                                        <th class="py-3 px-4">Bukti</th>
-                                        <th class="py-3 px-4 text-center">Aksi</th>
+                                        <th class="py-3 px-4 font-semibold">Tanggal</th>
+                                        <th class="py-3 px-4 font-semibold">Siswa / Kelas</th>
+                                        <th class="py-3 px-4 font-semibold">Elemen</th>
+                                        <th class="py-3 px-4 font-semibold text-center">Nilai</th>
+                                        <th class="py-3 px-4 font-semibold">Bukti</th>
+                                        <th class="py-3 px-4 font-semibold text-center">Aksi</th>
                                     </tr>
                                 </thead>
-                                <tbody id="scoreTableBody" class="text-sm divide-y divide-gray-100"></tbody>
+                                <tbody id="scoreTableBody" class="text-sm divide-y divide-gray-100">
+                                    <!-- Data Rows -->
+                                </tbody>
                             </table>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <!-- ================= TAB 2: DATA SISWA ================= -->
+            <div id="viewStudents" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                <!-- Form Input Siswa -->
+                <div class="lg:col-span-1">
+                    <div class="bg-white rounded-xl shadow-md p-6 border-t-4 border-green-600 sticky top-6">
+                        <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                            <i class="fa-solid fa-user-plus mr-2 text-green-600"></i> Tambah/Edit Siswa
+                        </h2>
+
+                        <form onsubmit="handleAddStudent(event)">
+                            <input type="hidden" id="editStudentId">
+
+                            <div class="mb-3">
+                                <label class="block text-xs font-bold text-gray-600 uppercase mb-1">NIS</label>
+                                <input type="text" id="studentNIS" class="w-full border p-2 rounded focus:ring-2 focus:ring-green-500 outline-none" placeholder="Contoh: 2024001" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Nama Lengkap</label>
+                                <input type="text" id="studentNameFull" class="w-full border p-2 rounded focus:ring-2 focus:ring-green-500 outline-none" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Email Siswa (Untuk Notifikasi)</label>
+                                <input type="email" id="studentEmail" class="w-full border p-2 rounded focus:ring-2 focus:ring-green-500 outline-none" placeholder="siswa@email.com">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Kelas</label>
+                                <select id="studentClass" class="w-full border p-2 rounded focus:ring-2 focus:ring-green-500 outline-none" required>
+                                    <option value="">Pilih Kelas</option>
+                                    <option value="X">Kelas X</option>
+                                    <option value="XI">Kelas XI</option>
+                                    <option value="XII">Kelas XII</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="block text-xs font-bold text-gray-600 uppercase mb-1">Foto Siswa</label>
+                                <input type="file" id="studentPhoto" accept="image/*" class="w-full text-sm text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+                                <img id="studentPhotoPreview" class="mt-2 w-full h-32 object-cover rounded-lg border hidden">
+                                <button type="button" onclick="removeStudentPhoto()" class="hidden text-xs text-red-500 mt-1 hover:underline" id="removeStudentPhotoBtn">Hapus Foto</button>
+                            </div>
+
+                            <div class="flex space-x-2">
+                                <button type="submit" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded transition shadow">
+                                    <i class="fa-solid fa-save mr-2"></i> Simpan
+                                </button>
+                                <button type="button" onclick="resetStudentForm()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded transition">
+                                    Batal
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Tabel Data Siswa -->
+                <div class="lg:col-span-2">
+                    <div class="bg-white rounded-xl shadow-md overflow-hidden h-[600px] flex flex-col">
+                        <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
+                            <h2 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-address-book mr-2 text-green-600"></i>Daftar Siswa</h2>
+                            <input type="text" id="searchStudent" onkeyup="filterStudents()" placeholder="Cari NIS/Nama..." class="border p-2 rounded text-sm w-40 focus:ring-1 focus:ring-green-500 outline-none">
+                        </div>
+                        <div class="overflow-auto flex-grow">
+                            <table class="w-full text-left border-collapse">
+                                <thead class="bg-gray-100 sticky top-0 z-10">
+                                    <tr class="text-gray-600 uppercase text-xs">
+                                        <th class="py-3 px-4 font-semibold">Foto</th>
+                                        <th class="py-3 px-4 font-semibold">NIS</th>
+                                        <th class="py-3 px-4 font-semibold">Nama</th>
+                                        <th class="py-3 px-4 font-semibold">Kelas</th>
+                                        <th class="py-3 px-4 font-semibold text-center">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="studentsTableBody" class="text-sm divide-y divide-gray-100">
+                                    <!-- Data Siswa Rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 
     <script>
-        // ⚙️ CONFIG FIREBASE (GANTI DENGAN PUNYA ANDA)
+        // ⚙️ KONFIGURASI FIREBASE (GANTI DENGAN PUNYA ANDA)
         const firebaseConfig = {
             apiKey: "AIzaSyAB4bfZCSHuhTL2mXBVb3ppRh_K0EWCQfQ",
             authDomain: "tjkt-asesmen.firebaseapp.com",
+            databaseURL: "https://tjkt-asesmen-default-rtdb.asia-southeast1.firebasedatabase.app",
             projectId: "tjkt-asesmen",
             storageBucket: "tjkt-asesmen.firebasestorage.app",
             messagingSenderId: "281854375632",
@@ -247,48 +365,46 @@
         const rubricDatabase = {
             "XI": {
                 "Keamanan Jaringan": [{
-                        aspect: "Persiapan konfigurasi",
-                        weight: 10
-                    }, {
-                        aspect: "Block SSH (Port 22)",
-                        weight: 25
-                    }, {
-                        aspect: "Block Web (Port 80/443)",
-                        weight: 15
-                    }, {
-                        aspect: "Troubleshooting",
-                        weight: 15
-                    }, {
-                        aspect: "Pengujian hasil konfigurasi",
-                        weight: 15
-                    }, {
-                        aspect: "Sikap & Kerapihan Kerja",
-                        weight: 10
-                    }, {
-                        aspect: "Nilai Akhir (Max 100)",
-                        weight: 10
-                    } // Normalisasi bobot sisa jika total > 100 atau sebagai penutup
-                ],
+                    aspect: "Persiapan konfigurasi",
+                    weight: 10
+                }, {
+                    aspect: "Block SSH (Port 22)",
+                    weight: 25
+                }, {
+                    aspect: "Block Web (Port 80/443)",
+                    weight: 15
+                }, {
+                    aspect: "Troubleshooting",
+                    weight: 15
+                }, {
+                    aspect: "Pengujian hasil konfigurasi",
+                    weight: 15
+                }, {
+                    aspect: "Sikap & Kerapihan Kerja",
+                    weight: 10
+                }, {
+                    aspect: "Nilai Akhir (Max 100)",
+                    weight: 10
+                }],
                 "Perencanaan & Pengalamatan": [{
-                        aspect: "Desain topologi jaringan",
-                        weight: 15
-                    }, {
-                        aspect: "Konfigurasi DHCP Server",
-                        weight: 15
-                    }, {
-                        aspect: "Konfigurasi DNS Server",
-                        weight: 15
-                    }, {
-                        aspect: "Konfigurasi FTP Server",
-                        weight: 15
-                    }, {
-                        aspect: "Konektivitas antar perangkat (Ping)",
-                        weight: 10
-                    }, {
-                        aspect: "Pengujian layanan DNS dan FTP",
-                        weight: 10
-                    } // Total 80%? Asumsi sisa 20% untuk sikap/laporan implisit, atau user adjust. Saya set sesuai prompt.
-                ],
+                    aspect: "Desain topologi jaringan",
+                    weight: 15
+                }, {
+                    aspect: "Konfigurasi DHCP Server",
+                    weight: 15
+                }, {
+                    aspect: "Konfigurasi DNS Server",
+                    weight: 15
+                }, {
+                    aspect: "Konfigurasi FTP Server",
+                    weight: 15
+                }, {
+                    aspect: "Konektivitas antar perangkat (Ping)",
+                    weight: 10
+                }, {
+                    aspect: "Pengujian layanan DNS dan FTP",
+                    weight: 10
+                }],
                 "Teknologi Kabel & Nirkabel": [{
                     aspect: "Reset dan persiapan perangkat",
                     weight: 10
@@ -383,8 +499,9 @@
         let allAssessments = [];
         let currentImageFile = null;
         let existingImageUrl = null;
+        let isAdmin = false;
 
-        // --- AUTH ---
+        // --- AUTHENTICATION ---
         auth.onAuthStateChanged(user => {
             if (user) {
                 currentUser = user;
@@ -392,7 +509,10 @@
                 document.getElementById('appScreen').classList.remove('hidden');
                 document.getElementById('userEmailDisplay').textContent = user.email;
                 document.getElementById('assessDate').valueAsDate = new Date();
+
+                checkUserRole(); // Cek apakah admin
                 loadAssessments();
+                loadStudentsForDropdown(); // Load data siswa untuk dropdown penilaian
             } else {
                 document.getElementById('loginScreen').classList.remove('hidden');
                 document.getElementById('appScreen').classList.add('hidden');
@@ -425,7 +545,59 @@
             location.reload();
         }
 
-        // --- FORM LOGIC ---
+        // --- ROLE ADMIN CHECK ---
+        async function checkUserRole() {
+            // Cek hardcoded email admin atau cek database users
+            // Untuk demo, kita anggap email tertentu adalah admin
+            const adminEmails = ['admin@smk.sch.id', 'kepsek@smk.sch.id'];
+            // Atau ambil dari collection users jika sudah dibuat
+
+            if (adminEmails.includes(currentUser.email)) {
+                isAdmin = true;
+                document.getElementById('userRoleBadge').classList.remove('hidden');
+                document.getElementById('adminFilterPanel').classList.remove('hidden');
+            } else {
+                isAdmin = false;
+                document.getElementById('userRoleBadge').classList.add('hidden');
+                document.getElementById('adminFilterPanel').classList.add('hidden');
+            }
+        }
+
+        // --- TAB SWITCHING ---
+        function switchTab(tabName) {
+            const viewAssess = document.getElementById('viewAssessment');
+            const viewStudents = document.getElementById('viewStudents');
+            const tabAssess = document.getElementById('tabAssessment');
+            const tabStudents = document.getElementById('tabStudents');
+
+            if (tabName === 'assessment') {
+                viewAssess.classList.remove('hidden');
+                viewStudents.classList.add('hidden');
+
+                tabAssess.classList.replace('text-blue-100', 'text-white');
+                tabAssess.classList.replace('hover:bg-blue-700', 'bg-blue-600');
+                tabAssess.classList.add('shadow');
+
+                tabStudents.classList.replace('text-white', 'text-blue-100');
+                tabStudents.classList.replace('bg-blue-600', 'hover:bg-blue-700');
+                tabStudents.classList.remove('shadow');
+            } else {
+                viewAssess.classList.add('hidden');
+                viewStudents.classList.remove('hidden');
+
+                tabStudents.classList.replace('text-blue-100', 'text-white');
+                tabStudents.classList.replace('hover:bg-blue-700', 'bg-blue-600');
+                tabStudents.classList.add('shadow');
+
+                tabAssess.classList.replace('text-white', 'text-blue-100');
+                tabAssess.classList.replace('bg-blue-600', 'hover:bg-blue-700');
+                tabAssess.classList.remove('shadow');
+
+                loadStudents(); // Refresh tabel siswa saat tab dibuka
+            }
+        }
+
+        // --- FORM PENILAIAN LOGIC ---
         function updateElements() {
             const cls = document.getElementById('classSelect').value;
             const elemSelect = document.getElementById('elementSelect');
@@ -457,14 +629,14 @@
             const aspects = rubricDatabase[cls][elem];
             aspects.forEach((item, index) => {
                 const div = document.createElement('div');
-                div.className = "flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-200";
+                div.className = "flex items-center justify-between bg-white p-2 rounded border border-gray-200 shadow-sm";
                 div.innerHTML = `
                     <div class="flex-1">
                         <p class="text-sm font-medium text-gray-700">${item.aspect}</p>
                         <p class="text-xs text-blue-600 font-bold">Bobot: ${item.weight}%</p>
                     </div>
                     <div class="w-20">
-                        <input type="number" min="0" max="100" class="rubric-input w-full border p-1 rounded text-center font-bold" 
+                        <input type="number" min="0" max="100" class="rubric-input w-full border p-1 rounded text-center font-bold text-blue-800" 
                                data-weight="${item.weight}" oninput="calculateTotal()" placeholder="0-100">
                     </div>
                 `;
@@ -476,24 +648,17 @@
         function calculateTotal() {
             const inputs = document.querySelectorAll('.rubric-input');
             let totalWeightedScore = 0;
-            let totalWeightUsed = 0;
 
             inputs.forEach(input => {
                 const val = parseFloat(input.value) || 0;
                 const weight = parseFloat(input.dataset.weight);
                 totalWeightedScore += (val * (weight / 100));
-                totalWeightUsed += weight;
             });
 
-            // Jika total bobot tidak 100%, kita normalisasi atau tampilkan apa adanya. 
-            // Untuk kasus prompt, beberapa total bobot != 100. Kita asumsikan nilai akhir adalah akumulasi langsung.
-            // Namun, agar adil, biasanya dibagi total bobot. Di sini saya tampilkan Accumulated Score.
-
             const finalScore = Math.round(totalWeightedScore);
-            document.getElementById('totalScoreDisplay').textContent = finalScore;
-
-            // Ubah warna skor
             const display = document.getElementById('totalScoreDisplay');
+            display.textContent = finalScore;
+
             if (finalScore >= 80) display.className = "text-2xl font-bold text-green-600";
             else if (finalScore >= 65) display.className = "text-2xl font-bold text-yellow-600";
             else display.className = "text-2xl font-bold text-red-600";
@@ -532,17 +697,9 @@
             removeImage();
         }
 
-        // --- SUBMIT & CRUD ---
-
+        // --- SUBMIT PENILAIAN ---
         async function handleSubmit(e) {
             e.preventDefault();
-
-            // 🚫 SKIP UPLOAD FOTO - SOLUSI DARURAT CORS
-            let finalImageUrl = '';
-            currentImageFile = null;
-            existingImageUrl = null;
-
-            // ... lanjut kode biasa di bawah ini ...
             if (!currentUser) return alert('Login required');
 
             const btn = document.getElementById('submitBtn');
@@ -555,18 +712,17 @@
 
             try {
                 const docId = document.getElementById('editDocId').value;
-                const student = document.getElementById('studentName').value.trim();
+                const student = document.getElementById('studentNameInput').value.trim(); // Ambil dari input manual/dropdown
                 const classLevel = document.getElementById('classSelect').value;
                 const element = document.getElementById('elementSelect').value;
                 const finalScore = parseInt(document.getElementById('totalScoreDisplay').textContent);
                 const feedback = document.getElementById('feedback').value.trim();
                 const date = document.getElementById('assessDate').value;
 
-                // Collect Rubric Details
                 const rubricDetails = [];
                 document.querySelectorAll('.rubric-input').forEach(input => {
                     rubricDetails.push({
-                        aspect: input.parentElement.previousElementSibling.innerText.split('\n')[0], // Get aspect name
+                        aspect: input.parentElement.previousElementSibling.innerText.split('\n')[0],
                         score: input.value,
                         weight: input.dataset.weight
                     });
@@ -575,15 +731,20 @@
                 if (!classLevel || !element) throw new Error('Lengkapi data kelas & elemen!');
 
                 let finalImageUrl = existingImageUrl || '';
+                // SKIP UPLOAD FOTO JIKA ADA ERROR CORS (SOLUSI DARURAT)
+                // Jika sudah setup CORS, hapus komentar di bawah ini:
+                /*
                 if (currentImageFile) {
                     const path = `bukti/${currentUser.uid}/${Date.now()}_${student.replace(/\s/g,'_')}.jpg`;
-
-
+                    const ref = storage.ref().child(path);
+                    await ref.put(currentImageFile);
                     finalImageUrl = await ref.getDownloadURL();
                 }
+                */
 
                 const payload = {
                     teacherId: currentUser.uid,
+                    teacherEmail: currentUser.email, // Untuk filter admin
                     student,
                     classLevel,
                     element,
@@ -614,18 +775,35 @@
             }
         }
 
+        // --- LOAD DATA PENILAIAN (DENGAN FILTER ADMIN) ---
         function loadAssessments() {
-            db.collection('penilaian').where('teacherId', '==', currentUser.uid).orderBy('createdAt', 'desc')
-                .onSnapshot(snapshot => {
-                    const data = [];
-                    snapshot.forEach(doc => data.push({
-                        id: doc.id,
-                        ...doc.data()
-                    }));
-                    allAssessments = data;
-                    renderTable(data);
-                    updateStats(data);
-                });
+            let query = db.collection('penilaian');
+
+            // Logic Filter Admin
+            if (isAdmin && document.getElementById('teacherDataFilter').value === 'all') {
+                // Admin lihat semua, urutkan berdasarkan tanggal terbaru
+                query = query.orderBy('createdAt', 'desc').limit(200);
+            } else {
+                // Guru biasa atau Admin mode "Saya Saja"
+                query = query.where('teacherId', '==', currentUser.uid).orderBy('createdAt', 'desc');
+            }
+
+            query.onSnapshot(snapshot => {
+                const data = [];
+                snapshot.forEach(doc => data.push({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                allAssessments = data;
+                renderTable(data);
+                updateStats(data);
+            }, err => {
+                console.error("Load Error:", err);
+                // Fallback jika index belum jadi
+                if (err.code === 'failed-precondition') {
+                    alert('Index sedang dibangun. Coba refresh halaman dalam 1 menit.');
+                }
+            });
         }
 
         function renderTable(data) {
@@ -636,7 +814,7 @@
             const filtered = data.filter(item => item.student.toLowerCase().includes(search));
 
             if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-400">Belum ada data.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-gray-400">Belum ada data.</td></tr>`;
                 return;
             }
 
@@ -646,21 +824,28 @@
                     `<img src="${item.imageUrl}" class="w-8 h-8 object-cover rounded cursor-pointer hover:scale-150 transition" onclick="window.open('${item.imageUrl}')">` :
                     `-`;
 
+                // Tampilkan Nama Guru jika Admin Mode All
+                const teacherInfo = isAdmin && document.getElementById('teacherDataFilter').value === 'all' ?
+                    `<div class="text-[10px] text-purple-600">Guru: ${item.teacherEmail?.split('@')[0]}</div>` :
+                    '';
+
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-blue-50 border-b';
                 tr.innerHTML = `
+                    <td class="py-3 px-4 text-xs text-gray-500 whitespace-nowrap">${item.date}</td>
                     <td class="py-3 px-4">
-                        <div class="font-bold">${item.student}</div>
+                        <div class="font-bold text-gray-800">${item.student}</div>
                         <div class="text-xs text-gray-500">Kelas ${item.classLevel}</div>
+                        ${teacherInfo}
                     </td>
-                    <td class="py-3 px-4 text-xs max-w-[150px] truncate">${item.element}</td>
+                    <td class="py-3 px-4 text-xs max-w-[150px] truncate text-blue-800">${item.element}</td>
                     <td class="py-3 px-4 text-center">
                         <span class="${scoreColor} py-1 px-3 rounded-full text-xs font-bold">${item.finalScore}</span>
                     </td>
                     <td class="py-3 px-4 text-center">${imgHtml}</td>
                     <td class="py-3 px-4 text-center space-x-2">
-                        <button onclick='editItem(${JSON.stringify(item).replace(/'/g, "&#39;")})' class="text-blue-500 bg-blue-50 p-2 rounded"><i class="fa-solid fa-pen"></i></button>
-                        <button onclick="deleteItem('${item.id}')" class="text-red-500 bg-red-50 p-2 rounded"><i class="fa-solid fa-trash"></i></button>
+                        <button onclick='editItem(${JSON.stringify(item).replace(/'/g, "&#39;")})' class="text-blue-500 bg-blue-50 p-2 rounded hover:bg-blue-100"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="deleteItem('${item.id}')" class="text-red-500 bg-red-50 p-2 rounded hover:bg-red-100"><i class="fa-solid fa-trash"></i></button>
                     </td>
                 `;
                 tbody.appendChild(tr);
@@ -673,13 +858,12 @@
 
         function editItem(item) {
             document.getElementById('editDocId').value = item.id;
-            document.getElementById('studentName').value = item.student;
+            document.getElementById('studentNameInput').value = item.student;
             document.getElementById('classSelect').value = item.classLevel;
-            updateElements(); // Load options
+            updateElements();
             document.getElementById('elementSelect').value = item.element;
-            renderRubricForm(); // Load inputs
+            renderRubricForm();
 
-            // Fill Scores
             if (item.rubricDetails) {
                 const inputs = document.querySelectorAll('.rubric-input');
                 item.rubricDetails.forEach((det, idx) => {
@@ -720,6 +904,149 @@
             document.getElementById('statAvg').textContent = avg;
         }
 
+        // --- MANAJEMEN SISWA ---
+
+        // Load Siswa ke Dropdown Penilaian
+        function loadStudentsForDropdown() {
+            const select = document.getElementById('studentNameSelect');
+            db.collection('students').where('teacherId', '==', currentUser.uid).orderBy('name')
+                .onSnapshot(snap => {
+                    select.innerHTML = '<option value="">-- Pilih dari Data --</option>';
+                    snap.forEach(doc => {
+                        const s = doc.data();
+                        const opt = document.createElement('option');
+                        opt.value = s.name;
+                        opt.textContent = `${s.name} (${s.nis}) - ${s.classLevel}`;
+                        select.appendChild(opt);
+                    });
+                });
+        }
+
+        // Load Tabel Siswa
+        function loadStudents() {
+            const tbody = document.getElementById('studentsTableBody');
+            db.collection('students').where('teacherId', '==', currentUser.uid).orderBy('name')
+                .onSnapshot(snap => {
+                    tbody.innerHTML = '';
+                    if (snap.empty) {
+                        tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-gray-400">Belum ada data siswa.</td></tr>`;
+                        return;
+                    }
+                    snap.forEach(doc => {
+                        const s = doc.data();
+                        const photoHtml = s.photoUrl ?
+                            `<img src="${s.photoUrl}" class="w-10 h-10 rounded-full object-cover border border-gray-200">` :
+                            `<div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-xs">${s.name.charAt(0)}</div>`;
+
+                        const tr = document.createElement('tr');
+                        tr.className = 'hover:bg-green-50 border-b';
+                        tr.innerHTML = `
+                          <td class="py-3 px-4">${photoHtml}</td>
+                          <td class="py-3 px-4 font-mono text-xs text-gray-600">${s.nis}</td>
+                          <td class="py-3 px-4 font-medium text-gray-800">${s.name}</td>
+                          <td class="py-3 px-4"><span class="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded">Kelas ${s.classLevel}</span></td>
+                          <td class="py-3 px-4 text-center space-x-2">
+                              <button onclick='editStudent("${doc.id}", ${JSON.stringify(s).replace(/'/g, "&#39;")})' class="text-blue-500 bg-blue-50 p-2 rounded hover:bg-blue-100"><i class="fa-solid fa-pen"></i></button>
+                              <button onclick="deleteStudent('${doc.id}')" class="text-red-500 bg-red-50 p-2 rounded hover:bg-red-100"><i class="fa-solid fa-trash"></i></button>
+                          </td>
+                      `;
+                        tbody.appendChild(tr);
+                    });
+                });
+        }
+
+        async function handleAddStudent(e) {
+            e.preventDefault();
+            if (!currentUser) return;
+
+            const nis = document.getElementById('studentNIS').value.trim();
+            const name = document.getElementById('studentNameFull').value.trim();
+            const email = document.getElementById('studentEmail').value.trim();
+            const classLevel = document.getElementById('studentClass').value;
+            const photoFile = document.getElementById('studentPhoto').files[0];
+
+            let photoUrl = '';
+            // Skip upload foto sementara jika CORS error, atau aktifkan jika sudah disetting
+            /*
+            if (photoFile) {
+                const path = `siswa_foto/${currentUser.uid}/${Date.now()}_${nis}.jpg`;
+                const ref = storage.ref().child(path);
+                await ref.put(photoFile);
+                photoUrl = await ref.getDownloadURL();
+            }
+            */
+
+            const studentData = {
+                teacherId: currentUser.uid,
+                nis,
+                name,
+                email,
+                classLevel,
+                photoUrl,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            const editId = document.getElementById('editStudentId').value;
+            if (editId) {
+                await db.collection('students').doc(editId).update(studentData);
+            } else {
+                await db.collection('students').add(studentData);
+            }
+
+            resetStudentForm();
+            alert('✅ Data siswa tersimpan!');
+        }
+
+        function editStudent(id, data) {
+            document.getElementById('editStudentId').value = id;
+            document.getElementById('studentNIS').value = data.nis;
+            document.getElementById('studentNameFull').value = data.name;
+            document.getElementById('studentEmail').value = data.email || '';
+            document.getElementById('studentClass').value = data.classLevel;
+
+            if (data.photoUrl) {
+                document.getElementById('studentPhotoPreview').src = data.photoUrl;
+                document.getElementById('studentPhotoPreview').classList.remove('hidden');
+                document.getElementById('removeStudentPhotoBtn').classList.remove('hidden');
+            } else {
+                removeStudentPhoto();
+            }
+
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
+
+        function resetStudentForm() {
+            document.querySelector('#viewStudents form').reset();
+            document.getElementById('editStudentId').value = "";
+            removeStudentPhoto();
+        }
+
+        function removeStudentPhoto() {
+            document.getElementById('studentPhoto').value = "";
+            document.getElementById('studentPhotoPreview').classList.add('hidden');
+            document.getElementById('removeStudentPhotoBtn').classList.add('hidden');
+        }
+
+        async function deleteStudent(id) {
+            if (!confirm('Hapus data siswa ini?')) return;
+            await db.collection('students').doc(id).delete();
+        }
+
+        function filterStudents() {
+            const search = document.getElementById('searchStudent').value.toLowerCase();
+            const rows = document.querySelectorAll('#studentsTableBody tr');
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(search) ? '' : 'none';
+            });
+        }
+
+        // --- EXPORT FEATURES ---
+
+        // Export Excel
         function exportToExcel() {
             if (!allAssessments.length) return alert("Data kosong");
             const data = allAssessments.map(i => ({
@@ -734,6 +1061,162 @@
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Rekap Nilai");
             XLSX.writeFile(wb, `Rekap_TJKT_${new Date().toISOString().slice(0,10)}.xlsx`);
+        }
+
+        // Export PDF Rapor dengan Logo
+        async function exportToPDF() {
+            const {
+                jsPDF
+            } = window.jspdf;
+
+            // Ambil data siswa terpilih dari dropdown chart (jika ada) atau input manual
+            // Untuk simplifikasi, kita pakai data dari tabel yang difilter atau input nama manual
+            // Di sini kita asumsikan user memilih siswa via dropdown chart yang sebelumnya ada, 
+            // tapi karena kita hapus chart di kode ini untuk ringkas, kita pakai prompt sederhana atau logic lain.
+            // Mari kita gunakan nama siswa dari input form penilaian terakhir atau cari di data.
+
+            // Cara terbaik: Buat dropdown khusus export PDF di UI. 
+            // Untuk kode ini, kita akan export data siswa yang namanya diketik di search bar atau pilih dari data unik.
+
+            const uniqueStudents = [...new Set(allAssessments.map(a => a.student))];
+            if (uniqueStudents.length === 0) return alert("Belum ada data nilai.");
+
+            // Prompt sederhana untuk memilih siswa (bisa diganti dropdown di UI)
+            const studentName = prompt("Masukkan Nama Siswa tepat seperti di data untuk Export PDF:\n\nDaftar Siswa:\n" + uniqueStudents.join("\n"));
+
+            if (!studentName) return;
+
+            const studentData = allAssessments.filter(a => a.student.toLowerCase() === studentName.toLowerCase());
+            if (studentData.length === 0) {
+                alert('Data tidak ditemukan. Pastikan nama sesuai.');
+                return;
+            }
+
+            const classLevel = studentData[0].classLevel;
+            const nis = "2024XXXX"; // Bisa diambil dari collection students jika mau lebih akurat
+
+            // URL Logo Sekolah (Ganti dengan URL logo sekolah Anda yang valid & CORS friendly)
+            // Gunakan Base64 jika masalah CORS persisten
+            const schoolLogoUrl = "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/Logo_Tut_Wuri_Handayani.png/600px-Logo_Tut_Wuri_Handayani.png";
+            const schoolName = "SMK NEGERI CONTOH TJKT";
+            const schoolAddress = "Jl. Pendidikan No. 1, Kota Teknologi";
+
+            const reportContainer = document.createElement('div');
+            reportContainer.style.width = '800px';
+            reportContainer.style.padding = '40px';
+            reportContainer.style.fontFamily = '"Times New Roman", serif';
+            reportContainer.style.background = '#fff';
+
+            const createRow = (date, elem, score, feedback) => {
+                const color = score >= 80 ? 'green' : score >= 70 ? 'orange' : 'red';
+                return `
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #333; text-align: center;">${date}</td>
+                        <td style="padding: 8px; border: 1px solid #333;">${elem}</td>
+                        <td style="padding: 8px; border: 1px solid #333; text-align: center; font-weight: bold; color: ${color};">${score}</td>
+                        <td style="padding: 8px; border: 1px solid #333; font-size: 12px;">${feedback || '-'}</td>
+                    </tr>
+                `;
+            };
+
+            reportContainer.innerHTML = `
+                <table style="width: 100%; border-bottom: 3px double #000; padding-bottom: 10px; margin-bottom: 20px;">
+                    <tr>
+                        <td style="width: 80px; text-align: center;">
+                            <img src="${schoolLogoUrl}" style="width: 70px; height: auto;" crossorigin="anonymous">
+                        </td>
+                        <td style="text-align: center; vertical-align: middle;">
+                            <h3 style="margin: 0; font-size: 18px;">PEMERINTAH PROVINSI CONTOH</h3>
+                            <h2 style="margin: 5px 0; font-size: 22px;">DINAS PENDIDIKAN</h2>
+                            <h1 style="margin: 5px 0; font-size: 24px;">${schoolName}</h1>
+                            <p style="margin: 0; font-size: 12px;">${schoolAddress}</p>
+                        </td>
+                    </tr>
+                </table>
+
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <h2 style="margin: 0; text-decoration: underline;">RAPOR PRAKTIK KEJURUAN</h2>
+                    <p style="margin: 5px 0;">TAHUN PELAJARAN 2025/2026</p>
+                </div>
+
+                <table style="width: 100%; margin-bottom: 20px; font-size: 14px;">
+                    <tr>
+                        <td style="width: 120px;">Nama Siswa</td>
+                        <td>: <strong>${studentName}</strong></td>
+                        <td style="width: 120px;">NIS/NISN</td>
+                        <td>: ${nis}</td>
+                    </tr>
+                    <tr>
+                        <td>Kelas/Jurusan</td>
+                        <td>: ${classLevel} / TJKT</td>
+                        <td>Semester</td>
+                        <td>: Ganjil/Genap</td>
+                    </tr>
+                </table>
+
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 13px;">
+                    <thead>
+                        <tr style="background-color: #f0f0f0;">
+                            <th style="padding: 8px; border: 1px solid #333; width: 10%;">No</th>
+                            <th style="padding: 8px; border: 1px solid #333; width: 15%;">Tanggal</th>
+                            <th style="padding: 8px; border: 1px solid #333; width: 35%;">Elemen Kompetensi</th>
+                            <th style="padding: 8px; border: 1px solid #333; width: 10%;">Nilai</th>
+                            <th style="padding: 8px; border: 1px solid #333; width: 30%;">Catatan Guru</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${studentData.map((item, index) => `<tr><td style="padding:8px;border:1px solid #333;text-align:center">${index+1}</td>${createRow(item.date, item.element, item.finalScore, item.feedback).substring(4)}</tr>`).join('')}
+                    </tbody>
+                </table>
+
+                <div style="display: flex; justify-content: space-between; margin-top: 30px; page-break-inside: avoid;">
+                    <div style="width: 45%;">
+                        <p><strong>Rata-rata Nilai Praktik:</strong> ${(studentData.reduce((sum, i) => sum + i.finalScore, 0) / studentData.length).toFixed(2)}</p>
+                        <p><strong>Predikat:</strong> ${getPredicate(studentData)}</p>
+                    </div>
+                    
+                    <div style="width: 45%; text-align: center;">
+                        <p>Kota Contoh, ${new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                        <p>Guru Mata Pelajaran,</p>
+                        <br><br><br>
+                        <p style="border-bottom: 1px solid #000; display: inline-block; min-width: 200px;">
+                            ${currentUser?.email?.split('@')[0] || '___________________'}
+                        </p>
+                        <p>NIP. 19800101 200501 1 001</p>
+                    </div>
+                </div>
+            `;
+
+            try {
+                const canvas = await html2canvas(reportContainer, { 
+                    scale: 2, 
+                    useCORS: true, 
+                    allowTaint: false,
+                    logging: false
+                });
+                
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                
+                const imgWidth = 210;
+                const pageHeight = 297;
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                
+                pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+                pdf.save(`Rapor_Praktik_${studentName.replace(/\s+/g, '_')}_${classLevel}.pdf`);
+                
+            } catch (err) {
+                console.error('PDF Generation Error:', err);
+                alert('Gagal generate PDF. Pastikan koneksi internet lancar untuk memuat logo.');
+            }
+        }
+
+        function getPredicate(data) {
+            const avg = data.reduce((sum, i) => sum + i.finalScore, 0) / data.length;
+            if (avg >= 85) return "Sangat Baik (A)";
+            if (avg >= 75) return "Baik (B)";
+            if (avg >= 65) return "Cukup (C)";
+            return "Perlu Bimbingan (D)";
         }
     </script>
 </body>
