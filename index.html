@@ -2,6 +2,33 @@
 <html lang="id">
 
 <head>
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1e3a8a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TJKT App">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3135/3135715.png">
+
+    <!-- PWA Register Script -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            // Minimal service worker untuk PWA valid
+            const swContent = `
+      self.addEventListener('fetch', (event) => {
+        event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+      });
+    `;
+            const blob = new Blob([swContent], {
+                type: 'application/javascript'
+            });
+            const swUrl = URL.createObjectURL(blob);
+
+            navigator.serviceWorker.register(swUrl)
+                .then(() => console.log('📱 PWA Service Worker registered'))
+                .catch(err => console.error('❌ SW Error:', err));
+        }
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>E-Assesmen TJKT Ultimate (Rubrik Bobot)</title>
